@@ -1,4 +1,5 @@
 const PROGRESS_KEY = 'englishTeacher.progress.v1';
+const CUSTOM_KEY = 'englishTeacher.customLists.v1';
 const MASTERY_THRESHOLD = 2;
 
 const CARD = 'rounded-3xl bg-white p-5 shadow-lg ring-1 ring-slate-200';
@@ -13,6 +14,9 @@ const unitTitle = document.getElementById('unit-title');
 
 const state = {
   lists: [],
+  customLists: [],
+  hideKnown: false,
+  enter: null,
   view: 'home',
   listId: null,
   index: 0,
@@ -38,6 +42,18 @@ function saveProgress() {
   localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
 }
 
+function loadCustomLists() {
+  try {
+    return JSON.parse(localStorage.getItem(CUSTOM_KEY)) || [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCustomLists() {
+  localStorage.setItem(CUSTOM_KEY, JSON.stringify(state.customLists));
+}
+
 function getRecord(word) {
   return progress[word] || { correct: 0, wrong: 0 };
 }
@@ -46,12 +62,24 @@ function isMastered(word) {
   return getRecord(word).correct >= MASTERY_THRESHOLD;
 }
 
+function allLists() {
+  return [...state.customLists, ...state.lists];
+}
+
 function currentList() {
-  return state.lists.find((list) => list.id === state.listId);
+  return allLists().find((list) => list.id === state.listId);
 }
 
 function allWords() {
-  return state.lists.flatMap((list) => list.words);
+  return allLists().flatMap((list) => list.words);
+}
+
+function isKnown(word) {
+  return Boolean(getRecord(word).known);
+}
+
+function visibleWords(list) {
+  return state.hideKnown ? list.words.filter((w) => !isKnown(w.word)) : list.words;
 }
 
 function shuffle(items) {
@@ -76,6 +104,73 @@ function escapeRegExp(text) {
 function highlight(sentence, word) {
   const pattern = new RegExp(`\\b(${escapeRegExp(word)})\\b`, 'gi');
   return esc(sentence).replace(pattern, '<mark class="rounded bg-amber-200 px-1">$1</mark>');
+}
+
+const HEBREW_CHARS = /[\u0590-\u05FF]/;
+const HEADER_WORDS = /^(english|word|hebrew|translation|אנגלית|עברית|מילה|תרגום)$/i;
+
+function parseCsvRows(text) {
+  const rows = [];
+  let row = [];
+  let cell = '';
+  let quoted = false;
+  const input = text.replace(/^\uFEFF/, '');
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i];
+    if (quoted) {
+      if (ch === '"' && input[i + 1] === '"') {
+        cell += '"';
+        i++;
+      } else if (ch === '"') {
+        quoted = false;
+      } else {
+        cell += ch;
+      }
+    } else if (ch === '"') {
+      quoted = true;
+    } else if (ch === ',') {
+      row.push(cell.trim());
+      cell = '';
+    } else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && input[i + 1] === '\n') i++;
+      row.push(cell.trim());
+      rows.push(row);
+      row = [];
+      cell = '';
+    } else {
+      cell += ch;
+    }
+  }
+  row.push(cell.trim());
+  rows.push(row);
+  return rows.filter((cells) => cells.some(Boolean));
+}
+
+function orderPair(a, b) {
+  return HEBREW_CHARS.test(a) && !HEBREW_CHARS.test(b) ? [b, a] : [a, b];
+}
+
+function buildWordsFromCsv(text) {
+  const seen = new Set();
+  const words = [];
+  for (const cells of parseCsvRows(text)) {
+    const [first = '', second = ''] = cells;
+    if (HEADER_WORDS.test(first) || HEADER_WORDS.test(second)) continue;
+    const [english, hebrew] = orderPair(first, second);
+    if (!english || !hebrew || HEBREW_CHARS.test(english) || seen.has(english.toLowerCase())) continue;
+    seen.add(english.toLowerCase());
+    const examples = [];
+    const examplesHe = [];
+    for (let i = 2; i + 1 < cells.length; i += 2) {
+      const [sentence, sentenceHe] = orderPair(cells[i], cells[i + 1]);
+      if (sentence && sentenceHe) {
+        examples.push(sentence);
+        examplesHe.push(sentenceHe);
+      }
+    }
+    words.push({ word: english, hebrew, partOfSpeech: '', phonetic: '', examples, examplesHe });
+  }
+  return words;
 }
 
 let voices = [];
@@ -205,49 +300,95 @@ function topBar(counter) {
     </div>`;
 }
 
+const LIST_EMOJIS = ['📘', '📗', '📙', '📕', '📓'];
+
+function importPanel() {
+  return `
+    <section class="${CARD} mb-4 text-center">
+      <p class="text-4xl">📥</p>
+      <h2 class="mt-1 text-lg font-bold">הוספת רשימה משלי</h2>
+      <p class="mt-1 text-sm text-slate-500" dir="ltr">CSV: English, עברית (שתי עמודות)</p>
+      <label class="mt-3 inline-block cursor-pointer rounded-2xl bg-indigo-600 px-6 py-3 font-bold text-white shadow-md transition hover:bg-indigo-700 active:scale-95">
+        בחירת קובץ CSV
+        <input id="csv-input" type="file" accept=".csv,text/csv" class="hidden" />
+      </label>
+    </section>`;
+}
+
+function listCard(list, emoji) {
+  const mastered = list.words.filter((w) => isMastered(w.word)).length;
+  const percent = Math.round((mastered / list.words.length) * 100);
+  return `
+    <section class="${CARD} mb-4">
+      <div class="flex items-center justify-between gap-3">
+        <h2 class="text-xl font-bold" dir="ltr">${emoji} ${esc(list.name)}</h2>
+        <span class="text-sm text-slate-500">${list.words.length} מילים</span>
+      </div>
+      <div class="mt-3 h-3 overflow-hidden rounded-full bg-slate-200">
+        <div class="progress-fill h-full rounded-full bg-emerald-500" style="width: ${percent}%; transform-origin: right"></div>
+      </div>
+      <p class="mt-1 text-sm text-slate-500">${percent === 100 ? '🎉 כל הכבוד, נשלטו כל המילים!' : `נשלטו: ${mastered} מתוך ${list.words.length}`}</p>
+      <div class="mt-4 grid grid-cols-3 gap-2">
+        <button type="button" data-action="open-cards" data-list="${esc(list.id)}" class="${BTN_TILE} bg-indigo-600 text-white hover:bg-indigo-700">🃏 כרטיסיות</button>
+        <button type="button" data-action="start-practice" data-list="${esc(list.id)}" class="${BTN_TILE} bg-amber-400 text-slate-900 hover:bg-amber-500">✏️ תרגול</button>
+        <button type="button" data-action="start-match" data-list="${esc(list.id)}" class="${BTN_TILE} bg-emerald-500 text-white hover:bg-emerald-600">🔗 חיבור</button>
+      </div>
+      ${list.custom ? `<button type="button" data-action="delete-custom" data-list="${esc(list.id)}" class="mt-3 w-full text-sm font-semibold text-red-600 hover:underline">🗑️ מחיקת הרשימה</button>` : ''}
+    </section>`;
+}
+
 function homeView() {
-  return state.lists.map((list) => {
-    const mastered = list.words.filter((w) => isMastered(w.word)).length;
-    const percent = Math.round((mastered / list.words.length) * 100);
-    return `
-      <section class="${CARD} mb-4">
-        <div class="flex items-center justify-between gap-3">
-          <h2 class="text-xl font-bold" dir="ltr">${esc(list.name)}</h2>
-          <span class="text-sm text-slate-500">${list.words.length} מילים</span>
-        </div>
-        <div class="mt-3 h-3 overflow-hidden rounded-full bg-slate-200">
-          <div class="h-full rounded-full bg-emerald-500" style="width: ${percent}%"></div>
-        </div>
-        <p class="mt-1 text-sm text-slate-500">נשלטו: ${mastered} מתוך ${list.words.length}</p>
-        <div class="mt-4 grid grid-cols-3 gap-2">
-          <button type="button" data-action="open-cards" data-list="${esc(list.id)}" class="${BTN_TILE} bg-indigo-600 text-white hover:bg-indigo-700">כרטיסיות</button>
-          <button type="button" data-action="start-practice" data-list="${esc(list.id)}" class="${BTN_TILE} bg-amber-400 text-slate-900 hover:bg-amber-500">תרגול</button>
-          <button type="button" data-action="start-match" data-list="${esc(list.id)}" class="${BTN_TILE} bg-emerald-500 text-white hover:bg-emerald-600">חיבור</button>
-        </div>
-      </section>`;
-  }).join('');
+  const custom = state.customLists.map((list) => listCard(list, '📄')).join('');
+  const builtIn = state.lists.map((list, i) => listCard(list, LIST_EMOJIS[i % LIST_EMOJIS.length])).join('');
+  return importPanel() + custom + builtIn;
 }
 
 function cardsView() {
   const list = currentList();
-  const word = list.words[state.index];
-  const total = list.words.length;
+  const words = visibleWords(list);
+  const hiddenCount = list.words.length - words.length;
+  const filterBar = `
+    <div class="mb-4 flex items-center justify-between gap-2 rounded-2xl bg-white px-4 py-2 shadow ring-1 ring-slate-200">
+      <button type="button" data-action="toggle-hide-known" class="${BTN_GHOST}">${state.hideKnown ? '👀 הצגת כל המילים' : '🙈 הסתרת מילים שאני יודע/ת'}</button>
+      <span class="text-sm text-slate-500">${hiddenCount ? `מוסתרות: ${hiddenCount}` : ''}</span>
+    </div>`;
+
+  if (!words.length) {
+    return `
+      ${topBar('0 / 0')}
+      ${filterBar}
+      <article class="${CARD} text-center">
+        <p class="text-5xl">🎉</p>
+        <h2 class="mt-3 text-xl font-bold">כל המילים ברשימה מסומנות כידועות!</h2>
+        <p class="mt-2 text-slate-500">אפשר להציג אותן שוב בכפתור למעלה.</p>
+      </article>`;
+  }
+
+  state.index = Math.min(state.index, words.length - 1);
+  const total = words.length;
+  const word = words[state.index];
+  const known = isKnown(word.word);
   return `
     ${topBar(`${state.index + 1} / ${total}`)}
+    ${filterBar}
     <article class="${CARD}">
       <div class="flex items-center justify-center gap-3" dir="ltr">
         <h2 class="text-4xl font-extrabold tracking-tight">${esc(word.word)}</h2>
         ${speakButton(word.word, 'השמעת המילה')}
       </div>
-      <p class="mt-2 text-center text-sm font-semibold uppercase text-indigo-600" dir="ltr">${esc(word.partOfSpeech)}</p>
-      <p class="mt-1 text-center text-lg text-slate-500" dir="ltr">${esc(word.phonetic)}</p>
+      ${word.partOfSpeech ? `<p class="mt-2 text-center text-sm font-semibold uppercase text-indigo-600" dir="ltr">${esc(word.partOfSpeech)}</p>` : ''}
+      ${word.phonetic ? `<p class="mt-1 text-center text-lg text-slate-500" dir="ltr">${esc(word.phonetic)}</p>` : ''}
       <div class="mt-4 flex items-center justify-center gap-3">
         <p class="text-2xl font-bold">${esc(word.hebrew)}</p>
         ${speakButton(word.hebrew, 'השמעת התרגום בעברית', 'he-IL', true)}
       </div>
+      <button type="button" data-action="toggle-known" data-word="${esc(word.word)}" class="mt-5 w-full rounded-2xl px-4 py-3 font-bold transition active:scale-95 ${known ? 'bg-green-500 text-white hover:bg-green-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}">
+        ${known ? '✅ מסומנת כידועה (לחצו לביטול)' : '⬜ סמנו כמילה שאני יודע/ת'}
+      </button>
     </article>
+    ${word.examples.length ? `
     <section class="${CARD} mt-4">
-      <h3 class="mb-3 font-bold">משפטים לדוגמה</h3>
+      <h3 class="mb-3 font-bold">📝 משפטים לדוגמה</h3>
       <div class="space-y-3">
         ${word.examples.map((example, i) => `
           <div class="rounded-2xl bg-sky-50 p-3">
@@ -263,7 +404,7 @@ function cardsView() {
             </div>
           </div>`).join('')}
       </div>
-    </section>
+    </section>` : ''}
     <div class="mt-6 grid grid-cols-2 gap-3">
       <button type="button" data-action="card-move" data-delta="-1" class="${BTN_ACCENT}" ${state.index === 0 ? 'disabled' : ''}>הקודמת</button>
       <button type="button" data-action="card-move" data-delta="1" class="${BTN_PRIMARY}" ${state.index === total - 1 ? 'disabled' : ''}>הבאה</button>
@@ -285,7 +426,7 @@ function optionButton(option, target) {
 }
 
 function feedback() {
-  const text = state.answered ? 'כל הכבוד!' : 'לא בדיוק, נסו שוב.';
+  const text = state.answered ? '🎉 כל הכבוד!' : '🤔 לא בדיוק, נסו שוב.';
   return `<p class="mt-5 text-center text-lg font-bold ${state.answered ? 'text-green-700' : 'text-red-600'}">${esc(text)}</p>`;
 }
 
@@ -295,8 +436,11 @@ function practiceView() {
   const isLast = state.index === total - 1;
   return `
     ${topBar(`${state.index + 1} / ${total}`)}
+    <div class="mb-4 h-3 overflow-hidden rounded-full bg-slate-200">
+      <div class="h-full rounded-full bg-amber-400" style="width: ${(state.index / total) * 100}%"></div>
+    </div>
     <article class="${CARD}">
-      <p class="text-center text-slate-500">מה התרגום של המילה?</p>
+      <p class="text-center text-slate-500">🤔 מה התרגום של המילה?</p>
       <div class="mt-3 flex items-center justify-center gap-3" dir="ltr">
         <h2 class="text-4xl font-extrabold tracking-tight">${esc(target.word)}</h2>
         ${speakButton(target.word, 'השמעת המילה')}
@@ -306,7 +450,7 @@ function practiceView() {
       </div>
       ${state.wrongPicks.length || state.answered ? feedback() : ''}
     </article>
-    ${state.answered ? `<button type="button" data-action="quiz-next" class="${BTN_PRIMARY} mt-6">${isLast ? 'לסיכום' : 'לשאלה הבאה'}</button>` : ''}`;
+    ${state.answered ? `<button type="button" data-action="quiz-next" class="${BTN_PRIMARY} mt-6">${isLast ? '🏁 לסיכום' : '🚀 לשאלה הבאה'}</button>` : ''}`;
 }
 
 function resultsView() {
@@ -314,7 +458,8 @@ function resultsView() {
   return `
     ${topBar('')}
     <article class="${CARD} text-center">
-      <h2 class="text-2xl font-bold">סיימתם את התרגול</h2>
+      <p class="text-6xl">${state.score === total ? '🏆' : '🎉'}</p>
+      <h2 class="mt-2 text-2xl font-bold">סיימתם את התרגול</h2>
       <p class="mt-3 text-5xl font-extrabold text-indigo-600" dir="ltr">${state.score} / ${total}</p>
       <p class="mt-2 text-slate-500">עניתם נכון על ${state.score} מתוך ${total} מילים.</p>
     </article>
@@ -360,7 +505,7 @@ function matchView() {
           ${right.map((word) => matchButton('he', word.word, word.hebrew)).join('')}
         </div>
       </div>
-      ${solved ? '<p class="mt-6 text-center text-lg font-bold text-green-700">מעולה! חיברתם את כל המילים.</p>' : ''}
+      ${solved ? '<p class="mt-6 text-center text-lg font-bold text-green-700">🎉 מעולה! חיברתם את כל המילים.</p>' : ''}
     </article>
     ${solved ? `
     <div class="mt-6 grid grid-cols-2 gap-3">
@@ -380,6 +525,26 @@ const VIEWS = {
 function render() {
   app.innerHTML = VIEWS[state.view]();
   if (state.view === 'match') requestAnimationFrame(drawMatchLines);
+  animateEntrance();
+}
+
+function animateEntrance() {
+  const direction = state.enter;
+  state.enter = null;
+  if (direction === 'home') {
+    app.querySelectorAll('.progress-fill').forEach((bar) => bar.animate(
+      [{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }],
+      { duration: 800, easing: 'ease-out' },
+    ));
+    return;
+  }
+  const card = app.querySelector('article');
+  if (!direction || !card) return;
+  const offset = direction === 'prev' ? -40 : 40;
+  card.animate(
+    [{ transform: `translateX(${offset}px)`, opacity: 0 }, { transform: 'translateX(0)', opacity: 1 }],
+    { duration: 350, easing: 'ease-out' },
+  );
 }
 
 function startMatch(listId) {
@@ -412,7 +577,7 @@ function matchPick(side, key) {
     progress[enKey] = { ...record, correct: record.correct + 1 };
     saveProgress();
     render();
-    celebrate(document.querySelector(`[data-side="he"][data-key="${enKey}"]`));
+    celebrate(document.querySelector(`[data-side="he"][data-key="${CSS.escape(enKey)}"]`));
     setTimeout(() => speak(enKey), 450);
     return;
   }
@@ -435,7 +600,7 @@ function drawMatchLines() {
   if (!board || !svg) return;
   const origin = board.getBoundingClientRect();
   const anchor = (side, key) => {
-    const rect = board.querySelector(`[data-side="${side}"][data-key="${key}"]`).getBoundingClientRect();
+    const rect = board.querySelector(`[data-side="${side}"][data-key="${CSS.escape(key)}"]`).getBoundingClientRect();
     return {
       x: (side === 'en' ? rect.right : rect.left) - origin.left,
       y: rect.top + rect.height / 2 - origin.top,
@@ -481,6 +646,17 @@ function startPractice(listId) {
   render();
 }
 
+function answerButton(hebrew) {
+  return [...document.querySelectorAll('[data-action="answer"]')].find((b) => b.dataset.hebrew === hebrew);
+}
+
+function shake(el) {
+  el?.animate(
+    [0, -8, 8, -6, 6, 0].map((x) => ({ transform: `translateX(${x}px)` })),
+    { duration: 400, easing: 'ease-in-out' },
+  );
+}
+
 function answer(hebrew) {
   const target = state.quiz[state.index];
   if (state.answered || state.wrongPicks.includes(hebrew)) return;
@@ -491,6 +667,7 @@ function answer(hebrew) {
     progress[target.word] = { ...record, wrong: record.wrong + 1 };
     saveProgress();
     render();
+    shake(answerButton(hebrew));
     return;
   }
 
@@ -506,7 +683,10 @@ function answer(hebrew) {
 function nextQuestion() {
   if (state.index + 1 >= state.quiz.length) {
     state.view = 'results';
+    state.enter = 'next';
+    if (state.score === state.quiz.length) playCheer();
   } else {
+    state.enter = 'next';
     state.index++;
     prepareQuestion();
   }
@@ -514,12 +694,13 @@ function nextQuestion() {
 }
 
 function moveCard(delta) {
+  state.enter = delta > 0 ? 'next' : 'prev';
   state.index += delta;
   render();
 }
 
 const ACTIONS = {
-  home: () => { state.view = 'home'; render(); },
+  home: () => { state.view = 'home'; state.enter = 'home'; render(); },
   'open-cards': (el) => openCards(el.dataset.list),
   'card-move': (el) => moveCard(Number(el.dataset.delta)),
   'start-practice': (el) => startPractice(el.dataset.list),
@@ -528,7 +709,57 @@ const ACTIONS = {
   speak: (el) => speak(el.dataset.text, el.dataset.lang),
   'start-match': (el) => startMatch(el.dataset.list),
   'match-pick': (el) => matchPick(el.dataset.side, el.dataset.key),
+  'toggle-hide-known': () => toggleHideKnown(),
+  'toggle-known': (el) => toggleKnown(el.dataset.word, el),
+  'delete-custom': (el) => deleteCustomList(el.dataset.list),
 };
+
+function toggleKnown(word, button) {
+  const record = getRecord(word);
+  const nowKnown = !record.known;
+  progress[word] = { ...record, known: nowKnown };
+  saveProgress();
+  if (nowKnown) celebrate(button);
+  render();
+}
+
+function toggleHideKnown() {
+  state.hideKnown = !state.hideKnown;
+  state.index = 0;
+  render();
+}
+
+async function importCsv(file) {
+  const words = buildWordsFromCsv(await file.text());
+  if (!words.length) {
+    alert('לא נמצאו מילים בקובץ.\nודאו ששורה בקובץ מכילה שתי עמודות: אנגלית ועברית, ושהקובץ נשמר בקידוד UTF-8.');
+    return;
+  }
+  state.customLists.push({
+    id: `custom-${Date.now()}`,
+    name: file.name.replace(/\.csv$/i, ''),
+    custom: true,
+    words,
+  });
+  saveCustomLists();
+  state.enter = 'home';
+  render();
+}
+
+function deleteCustomList(id) {
+  const list = state.customLists.find((item) => item.id === id);
+  if (!list || !confirm(`למחוק את הרשימה "${list.name}"?`)) return;
+  state.customLists = state.customLists.filter((item) => item.id !== id);
+  saveCustomLists();
+  render();
+}
+
+app.addEventListener('change', (event) => {
+  if (event.target.id !== 'csv-input') return;
+  const file = event.target.files[0];
+  event.target.value = '';
+  if (file) importCsv(file);
+});
 
 app.addEventListener('click', (event) => {
   const el = event.target.closest('[data-action]');
@@ -537,6 +768,8 @@ app.addEventListener('click', (event) => {
 });
 
 async function init() {
+  state.customLists = loadCustomLists();
+  state.enter = 'home';
   try {
     const response = await fetch('data/vocabulary.json', { cache: 'no-cache' });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
