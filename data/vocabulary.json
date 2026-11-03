@@ -1,0 +1,373 @@
+{
+  "unit": "A Typical Day?",
+  "lists": [
+    {
+      "id": "list-1",
+      "name": "List 1",
+      "words": [
+        {
+          "word": "across",
+          "partOfSpeech": "preposition / adverb",
+          "phonetic": "/əˈkrɒs/",
+          "hebrew": "מעבר ל-",
+          "examples": [
+            "We walked across the street together.",
+            "The cat ran across the garden."
+          ],
+          "examplesHe": [
+            "הלכנו יחד מעבר לרחוב.",
+            "החתול רץ מעבר לגינה."
+          ]
+        },
+        {
+          "word": "bridge",
+          "partOfSpeech": "noun",
+          "phonetic": "/brɪdʒ/",
+          "hebrew": "גשר",
+          "examples": [
+            "The bridge goes over the river.",
+            "We walked slowly across the old bridge."
+          ],
+          "examplesHe": [
+            "הגשר עובר מעל הנהר.",
+            "הלכנו לאט על הגשר הישן."
+          ]
+        },
+        {
+          "word": "careful",
+          "partOfSpeech": "adjective",
+          "phonetic": "/ˈkeəfəl/",
+          "hebrew": "זהיר",
+          "examples": [
+            "Please be careful with the glass.",
+            "She is careful when she crosses the road."
+          ],
+          "examplesHe": [
+            "בבקשה היזהר עם הזכוכית.",
+            "היא זהירה כשהיא חוצה את הכביש."
+          ]
+        },
+        {
+          "word": "directly",
+          "partOfSpeech": "adverb",
+          "phonetic": "/dəˈrektli/",
+          "hebrew": "ישירות",
+          "examples": [
+            "The bus goes directly to the school.",
+            "Don't look directly at the sun."
+          ],
+          "examplesHe": [
+            "האוטובוס נוסע ישירות לבית הספר.",
+            "אל תסתכל ישירות על השמש."
+          ]
+        },
+        {
+          "word": "journey",
+          "partOfSpeech": "noun",
+          "phonetic": "/ˈdʒɜːrni/",
+          "hebrew": "מסע",
+          "examples": [
+            "Our journey to the beach took two hours.",
+            "The journey was long, but it was fun."
+          ],
+          "examplesHe": [
+            "המסע שלנו לחוף נמשך שעתיים.",
+            "המסע היה ארוך, אבל היה כיף."
+          ]
+        },
+        {
+          "word": "next to",
+          "partOfSpeech": "preposition",
+          "phonetic": "/nekst tuː/",
+          "hebrew": "ליד",
+          "examples": [
+            "My bed is next to the window.",
+            "Please sit next to me."
+          ],
+          "examplesHe": [
+            "המיטה שלי ליד החלון.",
+            "בבקשה שב לידי."
+          ]
+        },
+        {
+          "word": "possible",
+          "partOfSpeech": "adjective",
+          "phonetic": "/ˈpɒsəbəl/",
+          "hebrew": "אפשרי",
+          "examples": [
+            "Is it possible to finish this today?",
+            "It is possible to learn English with practice."
+          ],
+          "examplesHe": [
+            "האם אפשר לסיים את זה היום?",
+            "אפשר ללמוד אנגלית עם תרגול."
+          ]
+        },
+        {
+          "word": "realize",
+          "partOfSpeech": "verb",
+          "phonetic": "/ˈriːəlaɪz/",
+          "hebrew": "להבין",
+          "examples": [
+            "I realize that I forgot my homework.",
+            "Did you realize that it is raining?"
+          ],
+          "examplesHe": [
+            "הבנתי ששכחתי את שיעורי הבית.",
+            "שמת לב שיורד גשם?"
+          ]
+        },
+        {
+          "word": "river",
+          "partOfSpeech": "noun",
+          "phonetic": "/ˈrɪvər/",
+          "hebrew": "נהר",
+          "examples": [
+            "The fish swam in the river.",
+            "We sat by the river and ate lunch."
+          ],
+          "examplesHe": [
+            "הדג שחה בנהר.",
+            "ישבנו ליד הנהר ואכלנו ארוחת צהריים."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "list-2",
+      "name": "List 2",
+      "words": [
+        {
+          "word": "activity",
+          "partOfSpeech": "noun",
+          "phonetic": "/ækˈtɪvəti/",
+          "hebrew": "פעילות",
+          "examples": [
+            "Swimming is my favorite activity.",
+            "Our school has many fun activities."
+          ],
+          "examplesHe": [
+            "שחייה היא הפעילות האהובה עליי.",
+            "לבית הספר שלנו יש הרבה פעילויות כיפיות."
+          ]
+        },
+        {
+          "word": "anybody",
+          "partOfSpeech": "pronoun",
+          "phonetic": "/ˈenibɒdi/",
+          "hebrew": "כל אחד",
+          "examples": [
+            "Does anybody want more juice?",
+            "I don't think anybody knows the answer."
+          ],
+          "examplesHe": [
+            "האם מישהו רוצה עוד מיץ?",
+            "אני לא חושב שמישהו יודע את התשובה."
+          ]
+        },
+        {
+          "word": "choice",
+          "partOfSpeech": "noun",
+          "phonetic": "/tʃɔɪs/",
+          "hebrew": "בחירה",
+          "examples": [
+            "You have a choice: tea or milk.",
+            "Taking the bus was a good choice."
+          ],
+          "examplesHe": [
+            "יש לך בחירה: תה או חלב.",
+            "לקחת את האוטובוס הייתה בחירה טובה."
+          ]
+        },
+        {
+          "word": "danger",
+          "partOfSpeech": "noun",
+          "phonetic": "/ˈdeɪndʒər/",
+          "hebrew": "סכנה",
+          "examples": [
+            "Fire can be a danger, so be careful.",
+            "There is no danger in this quiet park."
+          ],
+          "examplesHe": [
+            "אש יכולה להיות סכנה, לכן היזהר.",
+            "אין סכנה בפארק השקט הזה."
+          ]
+        },
+        {
+          "word": "fix",
+          "partOfSpeech": "verb",
+          "phonetic": "/fɪks/",
+          "hebrew": "לתקן",
+          "examples": [
+            "Dad will fix my bike today.",
+            "Can you fix the broken chair?"
+          ],
+          "examplesHe": [
+            "אבא יתקן לי את האופניים היום.",
+            "האם תוכל לתקן את הכיסא השבור?"
+          ]
+        },
+        {
+          "word": "imagine",
+          "partOfSpeech": "verb",
+          "phonetic": "/ɪˈmædʒɪn/",
+          "hebrew": "לדמיין",
+          "examples": [
+            "Imagine a car that can fly!",
+            "I can imagine living on a big ship."
+          ],
+          "examplesHe": [
+            "תדמיין מכונית שיכולה לעוף!",
+            "אני יכול לדמיין לגור על ספינה גדולה."
+          ]
+        },
+        {
+          "word": "unusual",
+          "partOfSpeech": "adjective",
+          "phonetic": "/ʌnˈjuːʒuəl/",
+          "hebrew": "יוצא דופן",
+          "examples": [
+            "It is unusual to see snow in summer.",
+            "The bird has an unusual song."
+          ],
+          "examplesHe": [
+            "זה לא שגרתי לראות שלג בקיץ.",
+            "לציפור יש שיר יוצא דופן."
+          ]
+        },
+        {
+          "word": "wide",
+          "partOfSpeech": "adjective",
+          "phonetic": "/waɪd/",
+          "hebrew": "רחב",
+          "examples": [
+            "The road is very wide.",
+            "She has a wide smile."
+          ],
+          "examplesHe": [
+            "הכביש רחב מאוד.",
+            "יש לה חיוך רחב."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "list-3",
+      "name": "List 3",
+      "words": [
+        {
+          "word": "any",
+          "partOfSpeech": "determiner / pronoun",
+          "phonetic": "/ˈeni/",
+          "hebrew": "כלשהו",
+          "examples": [
+            "Do you have any pencils?",
+            "You can take any book you like."
+          ],
+          "examplesHe": [
+            "יש לך עפרונות כלשהם?",
+            "אפשר לקחת כל ספר שתרצה."
+          ]
+        },
+        {
+          "word": "continue",
+          "partOfSpeech": "verb",
+          "phonetic": "/kənˈtɪnjuː/",
+          "hebrew": "להמשיך",
+          "examples": [
+            "Please continue reading the story.",
+            "We will continue our game after lunch."
+          ],
+          "examplesHe": [
+            "בבקשה המשך לקרוא את הסיפור.",
+            "נמשיך את המשחק שלנו אחרי ארוחת הצהריים."
+          ]
+        },
+        {
+          "word": "dangerous",
+          "partOfSpeech": "adjective",
+          "phonetic": "/ˈdeɪndʒərəs/",
+          "hebrew": "מסוכן",
+          "examples": [
+            "Swimming alone in the sea can be dangerous.",
+            "The stairs are dangerous when they are wet."
+          ],
+          "examplesHe": [
+            "שחייה לבד בים יכולה להיות מסוכנת.",
+            "המדרגות מסוכנות כשהן רטובות."
+          ]
+        },
+        {
+          "word": "depend on",
+          "partOfSpeech": "phrasal verb",
+          "phonetic": "/dɪˈpend ɒn/",
+          "hebrew": "תלוי ב-",
+          "examples": [
+            "Our plan will depend on the weather.",
+            "Our trip may depend on the bus times."
+          ],
+          "examplesHe": [
+            "התוכנית שלנו תלויה במזג האוויר.",
+            "הטיול שלנו עשוי להיות תלוי בזמני האוטובוס."
+          ]
+        },
+        {
+          "word": "mountain",
+          "partOfSpeech": "noun",
+          "phonetic": "/ˈmaʊntən/",
+          "hebrew": "הר",
+          "examples": [
+            "The mountain was covered with snow.",
+            "We hiked up the mountain on Sunday."
+          ],
+          "examplesHe": [
+            "ההר היה מכוסה בשלג.",
+            "טיפסנו על ההר ביום ראשון."
+          ]
+        },
+        {
+          "word": "prefer",
+          "partOfSpeech": "verb",
+          "phonetic": "/prɪˈfɜːr/",
+          "hebrew": "להעדיף",
+          "examples": [
+            "I prefer tea to coffee.",
+            "Do you prefer summer or winter?"
+          ],
+          "examplesHe": [
+            "אני מעדיף תה על פני קפה.",
+            "מה אתה מעדיף, קיץ או חורף?"
+          ]
+        },
+        {
+          "word": "usual",
+          "partOfSpeech": "adjective",
+          "phonetic": "/ˈjuːʒuəl/",
+          "hebrew": "רגיל",
+          "examples": [
+            "I go to school at my usual time.",
+            "My usual breakfast is cereal and milk."
+          ],
+          "examplesHe": [
+            "אני הולך לבית הספר בשעה הרגילה שלי.",
+            "ארוחת הבוקר הרגילה שלי היא דגני בוקר וחלב."
+          ]
+        },
+        {
+          "word": "village",
+          "partOfSpeech": "noun",
+          "phonetic": "/ˈvɪlɪdʒ/",
+          "hebrew": "כפר",
+          "examples": [
+            "The village is small and quiet.",
+            "Many children live in this village."
+          ],
+          "examplesHe": [
+            "הכפר קטן ושקט.",
+            "ילדים רבים גרים בכפר הזה."
+          ]
+        }
+      ]
+    }
+  ]
+}
