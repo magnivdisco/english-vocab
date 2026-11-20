@@ -1,5 +1,6 @@
 const PROGRESS_KEY = 'englishTeacher.progress.v1';
 const CUSTOM_KEY = 'englishTeacher.customLists.v1';
+const MODE_KEY = 'englishTeacher.mode.v1';
 const MASTERY_THRESHOLD = 2;
 
 const CARD = 'rounded-3xl bg-white p-5 shadow-lg ring-1 ring-slate-200';
@@ -13,7 +14,10 @@ const app = document.getElementById('app');
 const unitTitle = document.getElementById('unit-title');
 
 const state = {
+  mode: 'agam',
   lists: [],
+  yardenLists: [],
+  agamUnit: '',
   customLists: [],
   hideKnown: false,
   enter: null,
@@ -54,8 +58,27 @@ function saveCustomLists() {
   localStorage.setItem(CUSTOM_KEY, JSON.stringify(state.customLists));
 }
 
+function isYarden() {
+  return state.mode === 'yarden';
+}
+
+// Yarden progress is stored under its own keys so it never mixes with Agam progress.
+function recordKey(word) {
+  return isYarden() ? `yarden:${word}` : word;
+}
+
 function getRecord(word) {
-  return progress[word] || { correct: 0, wrong: 0 };
+  return progress[recordKey(word)] || { correct: 0, wrong: 0 };
+}
+
+function setRecord(word, record) {
+  progress[recordKey(word)] = record;
+  saveProgress();
+}
+
+// Agam words carry a Hebrew translation; Yarden words carry an English meaning.
+function translationOf(word) {
+  return word.hebrew ?? word.meaning;
 }
 
 function isMastered(word) {
@@ -63,7 +86,7 @@ function isMastered(word) {
 }
 
 function allLists() {
-  return [...state.customLists, ...state.lists];
+  return isYarden() ? state.yardenLists : [...state.customLists, ...state.lists];
 }
 
 function currentList() {
@@ -337,10 +360,33 @@ function listCard(list, emoji) {
     </section>`;
 }
 
+function modeSwitch() {
+  const option = (mode, label) => `<button type="button" data-action="set-mode" data-mode="${mode}" aria-pressed="${state.mode === mode}" dir="ltr" class="${BTN_TILE} ${state.mode === mode ? 'bg-indigo-600 text-white' : 'bg-white text-indigo-700 ring-1 ring-slate-200 hover:bg-indigo-50'}">${label}</button>`;
+  return `
+    <nav class="${CARD} mb-4 grid grid-cols-2 gap-2 p-3" aria-label="בחירת מצב לימוד">
+      ${option('agam', 'Agam')}
+      ${option('yarden', 'Yarden')}
+    </nav>`;
+}
+
 function homeView() {
+  if (isYarden()) {
+    return modeSwitch() + state.yardenLists.map((list, i) => listCard(list, LIST_EMOJIS[i % LIST_EMOJIS.length])).join('');
+  }
   const custom = state.customLists.map((list) => listCard(list, '📄')).join('');
   const builtIn = state.lists.map((list, i) => listCard(list, LIST_EMOJIS[i % LIST_EMOJIS.length])).join('');
-  return importPanel() + custom + builtIn;
+  return modeSwitch() + importPanel() + custom + builtIn;
+}
+
+function translationBlock(word) {
+  if (isYarden()) {
+    return `<p class="mt-4 text-center text-2xl font-bold" dir="ltr">${esc(word.meaning)}</p>`;
+  }
+  return `
+      <div class="mt-4 flex items-center justify-center gap-3">
+        <p class="text-2xl font-bold">${esc(word.hebrew)}</p>
+        ${speakButton(word.hebrew, 'השמעת התרגום בעברית', 'he-IL', true)}
+      </div>`;
 }
 
 function cardsView() {
@@ -378,10 +424,7 @@ function cardsView() {
       </div>
       ${word.partOfSpeech ? `<p class="mt-2 text-center text-sm font-semibold uppercase text-indigo-600" dir="ltr">${esc(word.partOfSpeech)}</p>` : ''}
       ${word.phonetic ? `<p class="mt-1 text-center text-lg text-slate-500" dir="ltr">${esc(word.phonetic)}</p>` : ''}
-      <div class="mt-4 flex items-center justify-center gap-3">
-        <p class="text-2xl font-bold">${esc(word.hebrew)}</p>
-        ${speakButton(word.hebrew, 'השמעת התרגום בעברית', 'he-IL', true)}
-      </div>
+      ${translationBlock(word)}
       <button type="button" data-action="toggle-known" data-word="${esc(word.word)}" class="mt-5 w-full rounded-2xl px-4 py-3 font-bold transition active:scale-95 ${known ? 'bg-green-500 text-white hover:bg-green-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}">
         ${known ? '✅ מסומנת כידועה (לחצו לביטול)' : '⬜ סמנו כמילה שאני יודע/ת'}
       </button>
@@ -392,15 +435,15 @@ function cardsView() {
       <div class="space-y-3">
         ${word.examples.map((example, i) => `
           <div class="rounded-2xl bg-sky-50 p-3">
-            <div class="grid grid-cols-2 items-center gap-3" dir="ltr">
+            <div class="grid ${isYarden() ? 'grid-cols-1' : 'grid-cols-2'} items-center gap-3" dir="ltr">
               <div class="flex min-w-0 items-center gap-2">
                 <p class="min-w-0 flex-1 text-base leading-snug" dir="ltr">${highlight(example, word.word)}</p>
                 ${speakButton(example, 'השמעת המשפט באנגלית', 'en-US', true)}
               </div>
-              <div class="flex min-w-0 items-center gap-2" dir="rtl">
+              ${isYarden() ? '' : `<div class="flex min-w-0 items-center gap-2" dir="rtl">
                 <p class="min-w-0 flex-1 text-base leading-snug">${esc(word.examplesHe[i])}</p>
                 ${speakButton(word.examplesHe[i], 'השמעת המשפט בעברית', 'he-IL', true)}
-              </div>
+              </div>`}
             </div>
           </div>`).join('')}
       </div>
@@ -412,16 +455,17 @@ function cardsView() {
 }
 
 function optionButton(option, target) {
-  const wrong = state.wrongPicks.includes(option.hebrew);
-  const correct = state.answered && option.hebrew === target.hebrew;
+  const choice = translationOf(option);
+  const wrong = state.wrongPicks.includes(choice);
+  const correct = state.answered && choice === translationOf(target);
   let style = 'border-slate-200 bg-white hover:border-indigo-400';
   if (correct) style = 'border-green-600 bg-green-100';
   else if (wrong) style = 'border-red-500 bg-red-100';
   const disabled = state.answered || wrong;
   return `
-    <button type="button" data-action="answer" data-hebrew="${esc(option.hebrew)}" ${disabled ? 'disabled' : ''}
+    <button type="button" data-action="answer" data-choice="${esc(choice)}" ${disabled ? 'disabled' : ''}${isYarden() ? ' dir="ltr"' : ''}
       class="w-full rounded-2xl border-2 px-4 py-4 text-lg font-semibold transition active:scale-95 disabled:cursor-default ${style}">
-      ${esc(option.hebrew)}
+      ${esc(choice)}
     </button>`;
 }
 
@@ -440,7 +484,7 @@ function practiceView() {
       <div class="h-full rounded-full bg-amber-400" style="width: ${(state.index / total) * 100}%"></div>
     </div>
     <article class="${CARD}">
-      <p class="text-center text-slate-500">🤔 מה התרגום של המילה?</p>
+      <p class="text-center text-slate-500">🤔 ${isYarden() ? 'מה המשמעות של המילה?' : 'מה התרגום של המילה?'}</p>
       <div class="mt-3 flex items-center justify-center gap-3" dir="ltr">
         <h2 class="text-4xl font-extrabold tracking-tight">${esc(target.word)}</h2>
         ${speakButton(target.word, 'השמעת המילה')}
@@ -481,7 +525,7 @@ function matchButton(side, key, text) {
   else if (isWrong) style = 'border-red-500 bg-red-100';
   else if (isSelected) style = 'border-indigo-600 bg-indigo-100';
   return `
-    <button type="button" data-action="match-pick" data-side="${side}" data-key="${esc(key)}" dir="${side === 'he' ? 'rtl' : 'ltr'}" ${isDone ? 'disabled' : ''}
+    <button type="button" data-action="match-pick" data-side="${side}" data-key="${esc(key)}" dir="${side === 'he' && !isYarden() ? 'rtl' : 'ltr'}" ${isDone ? 'disabled' : ''}
       class="w-full rounded-2xl border-2 px-3 py-3 text-base font-semibold transition active:scale-95 disabled:cursor-default ${style}">
       ${esc(text)}
     </button>`;
@@ -502,7 +546,7 @@ function matchView() {
           ${list.words.map((word) => matchButton('en', word.word, word.word)).join('')}
         </div>
         <div class="grid content-start gap-3">
-          ${right.map((word) => matchButton('he', word.word, word.hebrew)).join('')}
+          ${right.map((word) => matchButton('he', word.word, translationOf(word))).join('')}
         </div>
       </div>
       ${solved ? '<p class="mt-6 text-center text-lg font-bold text-green-700">🎉 מעולה! חיברתם את כל המילים.</p>' : ''}
@@ -574,16 +618,14 @@ function matchPick(side, key) {
   if (enKey === heKey) {
     match.selected = null;
     match.done.add(enKey);
-    progress[enKey] = { ...record, correct: record.correct + 1 };
-    saveProgress();
+    setRecord(enKey, { ...record, correct: record.correct + 1 });
     render();
     celebrate(document.querySelector(`[data-side="he"][data-key="${CSS.escape(enKey)}"]`));
     setTimeout(() => speak(enKey), 450);
     return;
   }
 
-  progress[enKey] = { ...record, wrong: record.wrong + 1 };
-  saveProgress();
+  setRecord(enKey, { ...record, wrong: record.wrong + 1 });
   const flash = { side, key };
   match.wrong = flash;
   render();
@@ -630,7 +672,7 @@ function openCards(listId) {
 
 function prepareQuestion() {
   const target = state.quiz[state.index];
-  const distractors = shuffle(allWords().filter((w) => w.hebrew !== target.hebrew)).slice(0, 3);
+  const distractors = shuffle(allWords().filter((w) => translationOf(w) !== translationOf(target))).slice(0, 3);
   state.options = shuffle([target, ...distractors]);
   state.answered = false;
   state.wrongPicks = [];
@@ -646,8 +688,8 @@ function startPractice(listId) {
   render();
 }
 
-function answerButton(hebrew) {
-  return [...document.querySelectorAll('[data-action="answer"]')].find((b) => b.dataset.hebrew === hebrew);
+function answerButton(choice) {
+  return [...document.querySelectorAll('[data-action="answer"]')].find((b) => b.dataset.choice === choice);
 }
 
 function shake(el) {
@@ -657,26 +699,24 @@ function shake(el) {
   );
 }
 
-function answer(hebrew) {
+function answer(choice) {
   const target = state.quiz[state.index];
-  if (state.answered || state.wrongPicks.includes(hebrew)) return;
+  if (state.answered || state.wrongPicks.includes(choice)) return;
   const record = getRecord(target.word);
 
-  if (hebrew !== target.hebrew) {
-    state.wrongPicks.push(hebrew);
-    progress[target.word] = { ...record, wrong: record.wrong + 1 };
-    saveProgress();
+  if (choice !== translationOf(target)) {
+    state.wrongPicks.push(choice);
+    setRecord(target.word, { ...record, wrong: record.wrong + 1 });
     render();
-    shake(answerButton(hebrew));
+    shake(answerButton(choice));
     return;
   }
 
   state.answered = true;
   if (state.wrongPicks.length === 0) state.score++;
-  progress[target.word] = { ...record, correct: record.correct + 1 };
-  saveProgress();
+  setRecord(target.word, { ...record, correct: record.correct + 1 });
   render();
-  celebrate([...document.querySelectorAll('[data-action="answer"]')].find((b) => b.dataset.hebrew === hebrew));
+  celebrate(answerButton(choice));
   setTimeout(() => speak(target.word), 450);
 }
 
@@ -704,7 +744,8 @@ const ACTIONS = {
   'open-cards': (el) => openCards(el.dataset.list),
   'card-move': (el) => moveCard(Number(el.dataset.delta)),
   'start-practice': (el) => startPractice(el.dataset.list),
-  answer: (el) => answer(el.dataset.hebrew),
+  answer: (el) => answer(el.dataset.choice),
+  'set-mode': (el) => setMode(el.dataset.mode),
   'quiz-next': nextQuestion,
   speak: (el) => speak(el.dataset.text, el.dataset.lang),
   'start-match': (el) => startMatch(el.dataset.list),
@@ -717,9 +758,18 @@ const ACTIONS = {
 function toggleKnown(word, button) {
   const record = getRecord(word);
   const nowKnown = !record.known;
-  progress[word] = { ...record, known: nowKnown };
-  saveProgress();
+  setRecord(word, { ...record, known: nowKnown });
   if (nowKnown) celebrate(button);
+  render();
+}
+
+function setMode(mode) {
+  state.mode = mode;
+  localStorage.setItem(MODE_KEY, mode);
+  state.view = 'home';
+  state.listId = null;
+  state.enter = 'home';
+  unitTitle.textContent = isYarden() ? 'Yarden' : state.agamUnit;
   render();
 }
 
@@ -767,15 +817,25 @@ app.addEventListener('click', (event) => {
   ACTIONS[el.dataset.action]?.(el);
 });
 
+async function fetchJson(url) {
+  const response = await fetch(url, { cache: 'no-cache' });
+  if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
+  return response.json();
+}
+
 async function init() {
   state.customLists = loadCustomLists();
+  state.mode = localStorage.getItem(MODE_KEY) === 'yarden' ? 'yarden' : 'agam';
   state.enter = 'home';
   try {
-    const response = await fetch('data/vocabulary.json', { cache: 'no-cache' });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data = await response.json();
-    state.lists = data.lists;
-    unitTitle.textContent = data.unit;
+    const [agam, yarden] = await Promise.all([
+      fetchJson('data/vocabulary.json'),
+      fetchJson('data/yarden.json'),
+    ]);
+    state.lists = agam.lists;
+    state.agamUnit = agam.unit;
+    state.yardenLists = yarden.lists;
+    unitTitle.textContent = isYarden() ? 'Yarden' : agam.unit;
     render();
   } catch (error) {
     console.error(error);
