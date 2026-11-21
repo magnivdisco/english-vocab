@@ -30,6 +30,10 @@ const state = {
   wrongPicks: [],
   score: 0,
   match: null,
+  section: null,
+  pronounQuestions: [],
+  pronounAnswers: {},
+  pronounIndex: 0,
 };
 
 let progress = loadProgress();
@@ -127,73 +131,6 @@ function escapeRegExp(text) {
 function highlight(sentence, word) {
   const pattern = new RegExp(`\\b(${escapeRegExp(word)})\\b`, 'gi');
   return esc(sentence).replace(pattern, '<mark class="rounded bg-amber-200 px-1">$1</mark>');
-}
-
-const HEBREW_CHARS = /[\u0590-\u05FF]/;
-const HEADER_WORDS = /^(english|word|hebrew|translation|אנגלית|עברית|מילה|תרגום)$/i;
-
-function parseCsvRows(text) {
-  const rows = [];
-  let row = [];
-  let cell = '';
-  let quoted = false;
-  const input = text.replace(/^\uFEFF/, '');
-  for (let i = 0; i < input.length; i++) {
-    const ch = input[i];
-    if (quoted) {
-      if (ch === '"' && input[i + 1] === '"') {
-        cell += '"';
-        i++;
-      } else if (ch === '"') {
-        quoted = false;
-      } else {
-        cell += ch;
-      }
-    } else if (ch === '"') {
-      quoted = true;
-    } else if (ch === ',') {
-      row.push(cell.trim());
-      cell = '';
-    } else if (ch === '\n' || ch === '\r') {
-      if (ch === '\r' && input[i + 1] === '\n') i++;
-      row.push(cell.trim());
-      rows.push(row);
-      row = [];
-      cell = '';
-    } else {
-      cell += ch;
-    }
-  }
-  row.push(cell.trim());
-  rows.push(row);
-  return rows.filter((cells) => cells.some(Boolean));
-}
-
-function orderPair(a, b) {
-  return HEBREW_CHARS.test(a) && !HEBREW_CHARS.test(b) ? [b, a] : [a, b];
-}
-
-function buildWordsFromCsv(text) {
-  const seen = new Set();
-  const words = [];
-  for (const cells of parseCsvRows(text)) {
-    const [first = '', second = ''] = cells;
-    if (HEADER_WORDS.test(first) || HEADER_WORDS.test(second)) continue;
-    const [english, hebrew] = orderPair(first, second);
-    if (!english || !hebrew || HEBREW_CHARS.test(english) || seen.has(english.toLowerCase())) continue;
-    seen.add(english.toLowerCase());
-    const examples = [];
-    const examplesHe = [];
-    for (let i = 2; i + 1 < cells.length; i += 2) {
-      const [sentence, sentenceHe] = orderPair(cells[i], cells[i + 1]);
-      if (sentence && sentenceHe) {
-        examples.push(sentence);
-        examplesHe.push(sentenceHe);
-      }
-    }
-    words.push({ word: english, hebrew, partOfSpeech: '', phonetic: '', examples, examplesHe });
-  }
-  return words;
 }
 
 let voices = [];
@@ -325,19 +262,6 @@ function topBar(counter) {
 
 const LIST_EMOJIS = ['📘', '📗', '📙', '📕', '📓'];
 
-function importPanel() {
-  return `
-    <section class="${CARD} mb-4 text-center">
-      <p class="text-4xl">📥</p>
-      <h2 class="mt-1 text-lg font-bold">הוספת רשימה משלי</h2>
-      <p class="mt-1 text-sm text-slate-500" dir="ltr">CSV: English, עברית (שתי עמודות)</p>
-      <label class="mt-3 inline-block cursor-pointer rounded-2xl bg-indigo-600 px-6 py-3 font-bold text-white shadow-md transition hover:bg-indigo-700 active:scale-95">
-        בחירת קובץ CSV
-        <input id="csv-input" type="file" accept=".csv,text/csv" class="hidden" />
-      </label>
-    </section>`;
-}
-
 function listCard(list, emoji) {
   const mastered = list.words.filter((w) => isMastered(w.word)).length;
   const percent = Math.round((mastered / list.words.length) * 100);
@@ -369,13 +293,99 @@ function modeSwitch() {
     </nav>`;
 }
 
+function sectionMenu() {
+  const tile = (section, emoji, title, subtitle) => `
+    <button type="button" data-action="open-section" data-section="${section}" class="${CARD} mb-4 w-full text-right transition hover:ring-indigo-400 active:scale-95">
+      <p class="text-4xl">${emoji}</p>
+      <h2 class="mt-2 text-xl font-bold">${title}</h2>
+      <p class="mt-1 text-sm text-slate-500">${subtitle}</p>
+    </button>`;
+  return modeSwitch()
+    + tile('vocab', '📚', 'אוצר מילים', 'רשימות המילים ותרגול')
+    + tile('pronouns', '🧩', 'PRONOUNS', 'תרגיל: כינויי גוף');
+}
+
+function openSection(section) {
+  state.section = section;
+  state.view = section === 'pronouns' ? 'pronouns' : 'home';
+  if (section === 'pronouns') {
+    state.pronounAnswers = {};
+    state.pronounIndex = 0;
+  }
+  state.enter = 'home';
+  render();
+}
+
 function homeView() {
   if (isYarden()) {
     return modeSwitch() + state.yardenLists.map((list, i) => listCard(list, LIST_EMOJIS[i % LIST_EMOJIS.length])).join('');
   }
+  if (!state.section) return sectionMenu();
   const custom = state.customLists.map((list) => listCard(list, '📄')).join('');
-  const builtIn = state.lists.map((list, i) => listCard(list, LIST_EMOJIS[i % LIST_EMOJIS.length])).join('');
-  return modeSwitch() + importPanel() + custom + builtIn;
+  const builtIn = state.lists.map((list, i) => listCard(list, LIST_EMOJIS[i % LIST_EMOJIS.length])).reverse().join('');
+  return modeSwitch() + custom + builtIn
+    + `<div class="mt-2 text-center"><button type="button" data-action="section-menu" class="${BTN_GHOST}">לתפריט הראשי</button></div>`;
+}
+
+function buildPronounQuestions({ items, options }) {
+  return items.map((item) => {
+    const distractors = shuffle(options.filter((option) => option !== item.answer)).slice(0, 3);
+    return { ...item, options: shuffle([item.answer, ...distractors]) };
+  });
+}
+
+function pronounTabs(questions, index) {
+  return questions.map((question, i) => {
+    const picked = state.pronounAnswers[question.id];
+    const tone = picked === undefined ? 'bg-white text-slate-600 ring-slate-300'
+      : picked === question.answer ? 'bg-green-600 text-white ring-green-600'
+      : 'bg-red-500 text-white ring-red-500';
+    const current = i === index ? 'scale-110 shadow-md' : '';
+    return `<button type="button" data-action="pronoun-go" data-index="${i}" aria-label="שאלה ${i + 1}" class="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-sm font-bold ring-2 transition ${current} ${tone}">${i + 1}</button>`;
+  }).join('');
+}
+
+function pronounsView() {
+  const questions = state.pronounQuestions;
+  const index = state.pronounIndex;
+  const item = questions[index];
+  const picked = state.pronounAnswers[item.id];
+  const answered = picked !== undefined;
+  const correct = questions.filter((q) => state.pronounAnswers[q.id] === q.answer).length;
+  const choices = item.options.map((option) => {
+    let style = 'bg-white ring-slate-200 hover:ring-indigo-400';
+    if (answered && option === item.answer) style = 'bg-green-100 ring-green-600';
+    else if (answered && option === picked) style = 'bg-red-100 ring-red-500';
+    else if (answered) style = 'bg-white ring-slate-200 opacity-50';
+    return `<button type="button" data-action="pronoun-pick" data-id="${item.id}" data-value="${esc(option)}" ${answered ? 'disabled' : ''} dir="ltr" class="rounded-2xl px-4 py-4 text-xl font-bold ring-2 transition active:scale-95 disabled:cursor-default ${style}">${esc(option)}</button>`;
+  }).join('');
+  const feedback = !answered ? ''
+    : picked === item.answer
+      ? '<p class="mt-4 text-center text-lg font-bold text-green-700">נכון!</p>'
+      : `<p class="mt-4 text-center text-lg font-bold text-red-700">התשובה הנכונה: <span dir="ltr">${esc(item.answer)}</span></p>`;
+  return `
+    <div class="mb-4 flex items-center justify-between gap-2">
+      <button type="button" data-action="section-menu" class="${BTN_GHOST}">חזרה לתפריט</button>
+    </div>
+    <div class="mb-4 flex gap-2 overflow-x-auto pb-2">${pronounTabs(questions, index)}</div>
+    <article class="${CARD}">
+      <p class="text-center text-sm font-semibold text-slate-400">שאלה ${index + 1} מתוך ${questions.length}</p>
+      <div class="mt-3 flex items-center justify-center gap-4">
+        <span class="text-3xl font-extrabold" dir="ltr">${esc(item.phrase)}</span>
+        ${speakButton(item.phrase, 'השמעת המילה', 'en-US', true)}
+      </div>
+      <p class="mt-1 text-center text-slate-500">בחרו את הכינוי המתאים.</p>
+      <div class="mt-5 grid grid-cols-2 gap-3">${choices}</div>
+      ${feedback}
+    </article>
+    <div class="mt-6 grid grid-cols-2 gap-3">
+      <button type="button" data-action="pronoun-go" data-index="${index - 1}" ${index === 0 ? 'disabled' : ''} class="${BTN_PRIMARY}">הקודם</button>
+      <button type="button" data-action="pronoun-go" data-index="${index + 1}" ${index === questions.length - 1 ? 'disabled' : ''} class="${BTN_PRIMARY}">הבא</button>
+    </div>
+    <p class="mt-5 text-center font-bold text-indigo-600">ענית נכון על ${correct} מתוך ${questions.length}</p>
+    <div class="mt-3">
+      <button type="button" data-action="pronoun-reset" class="${BTN_ACCENT}">נסו שוב</button>
+    </div>`;
 }
 
 function translationBlock(word) {
@@ -560,6 +570,7 @@ function matchView() {
 
 const VIEWS = {
   home: homeView,
+  pronouns: pronounsView,
   cards: cardsView,
   practice: practiceView,
   results: resultsView,
@@ -746,6 +757,11 @@ const ACTIONS = {
   'start-practice': (el) => startPractice(el.dataset.list),
   answer: (el) => answer(el.dataset.choice),
   'set-mode': (el) => setMode(el.dataset.mode),
+  'open-section': (el) => openSection(el.dataset.section),
+  'section-menu': () => { state.section = null; state.view = 'home'; state.enter = 'home'; render(); },
+  'pronoun-pick': (el) => { state.pronounAnswers[el.dataset.id] = el.dataset.value; render(); },
+  'pronoun-go': (el) => { state.pronounIndex = Number(el.dataset.index); render(); },
+  'pronoun-reset': () => { state.pronounAnswers = {}; state.pronounIndex = 0; render(); },
   'quiz-next': nextQuestion,
   speak: (el) => speak(el.dataset.text, el.dataset.lang),
   'start-match': (el) => startMatch(el.dataset.list),
@@ -765,6 +781,7 @@ function toggleKnown(word, button) {
 
 function setMode(mode) {
   state.mode = mode;
+  state.section = null;
   localStorage.setItem(MODE_KEY, mode);
   state.view = 'home';
   state.listId = null;
@@ -779,23 +796,6 @@ function toggleHideKnown() {
   render();
 }
 
-async function importCsv(file) {
-  const words = buildWordsFromCsv(await file.text());
-  if (!words.length) {
-    alert('לא נמצאו מילים בקובץ.\nודאו ששורה בקובץ מכילה שתי עמודות: אנגלית ועברית, ושהקובץ נשמר בקידוד UTF-8.');
-    return;
-  }
-  state.customLists.push({
-    id: `custom-${Date.now()}`,
-    name: file.name.replace(/\.csv$/i, ''),
-    custom: true,
-    words,
-  });
-  saveCustomLists();
-  state.enter = 'home';
-  render();
-}
-
 function deleteCustomList(id) {
   const list = state.customLists.find((item) => item.id === id);
   if (!list || !confirm(`למחוק את הרשימה "${list.name}"?`)) return;
@@ -803,13 +803,6 @@ function deleteCustomList(id) {
   saveCustomLists();
   render();
 }
-
-app.addEventListener('change', (event) => {
-  if (event.target.id !== 'csv-input') return;
-  const file = event.target.files[0];
-  event.target.value = '';
-  if (file) importCsv(file);
-});
 
 app.addEventListener('click', (event) => {
   const el = event.target.closest('[data-action]');
@@ -828,13 +821,15 @@ async function init() {
   state.mode = localStorage.getItem(MODE_KEY) === 'yarden' ? 'yarden' : 'agam';
   state.enter = 'home';
   try {
-    const [agam, yarden] = await Promise.all([
+    const [agam, yarden, pronouns] = await Promise.all([
       fetchJson('data/vocabulary.json'),
       fetchJson('data/yarden.json'),
+      fetchJson('data/pronouns.json'),
     ]);
     state.lists = agam.lists;
     state.agamUnit = agam.unit;
     state.yardenLists = yarden.lists;
+    state.pronounQuestions = buildPronounQuestions(pronouns);
     unitTitle.textContent = isYarden() ? 'Yarden' : agam.unit;
     render();
   } catch (error) {

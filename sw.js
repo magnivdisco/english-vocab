@@ -5,6 +5,7 @@ const APP_SHELL = [
   './js/app.js',
   './data/vocabulary.json',
   './data/yarden.json',
+  './data/pronouns.json',
   './manifest.webmanifest',
   './icons/icon.svg',
 ];
